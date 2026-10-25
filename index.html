@@ -250,14 +250,186 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   
   <script>
-    // ▼▼▼ FirebaseのURLをご自身のものに書き換えてください（末尾の / を忘れずに） ▼▼▼
+    // ▼ URLの末尾の /students を消しました ▼
     const firebaseConfig = {
-      databaseURL: "https://uketuke-ai-cafe-default-rtdb.asia-southeast1.firebasedatabase.app/students" 
+      databaseURL: "https://uketuke-ai-cafe-default-rtdb.asia-southeast1.firebasedatabase.app/" 
     };
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
     // Firebaseの初期化
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     
     let currentStudent = null;
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        let confirmModal = document.getElementById('confirmModal');
+        let instructionModal = document.getElementById('instructionModal');
+        if (instructionModal.classList.contains('active')) {
+          e.preventDefault(); reset();
+        } else if (confirmModal.classList.contains('active')) {
+          e.preventDefault();
+          let okBtn = document.getElementById('btnOk');
+          if (!okBtn.disabled) approve();
+        }
+      }
+    });
+
+    function openSidebar() {
+      document.getElementById('sidebar').classList.add('active');
+      document.getElementById('sidebar-overlay').style.display = 'block';
+    }
+    
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('active');
+      document.getElementById('sidebar-overlay').style.display = 'none';
+    }
+    
+    function updateBadge() {
+      let day  = document.getElementById('configDay').value;
+      let room = document.getElementById('configRoom').value.trim();
+      document.getElementById('mode-badge').innerText = day + ' | ' + (room ? room + 'ブース' : '全ブース');
+    }
+
+    function startCamera() {
+      let iframe = document.getElementById('camera-iframe');
+      let ph     = document.getElementById('camera-placeholder');
+      iframe.src = 'camera.html';
+      iframe.style.display = 'block';
+      ph.style.display = 'none';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (!e.data || e.data.type !== 'QR_SCANNED') return;
+      let num = String(e.data.num).trim();
+      if (!/^\d{4}$/.test(num)) return;
+
+      document.getElementById('pNumInput').value = num;
+      document.getElementById('pNumInput').classList.add('scanning');
+      setTimeout(() => document.getElementById('pNumInput').classList.remove('scanning'), 800);
+      doCheck();
+    });
+
+    // 照会処理（Firebaseと直接通信）
+    function doCheck() {
+      let pNum = document.getElementById('pNumInput').value.trim();
+      if (!pNum || pNum.length < 4) return;
+      
+      let btn = document.getElementById('check-btn');
+      btn.disabled = true; btn.innerText = '照会中...';
+
+      let config = {
+        currentDay:  document.getElementById('configDay').value,
+        currentRoom: document.getElementById('configRoom').value.trim()
+      };
+
+      // Firebaseから直接データを取得
+      db.ref('students/' + pNum).once('value')
+        .then((snapshot) => {
+          resetBtn();
+          const studentData = snapshot.val();
+
+          if (!studentData) {
+            alert('該当する番号が見つかりません。');
+            document.getElementById('pNumInput').value = '';
+            document.getElementById('pNumInput').focus();
+            return;
+          }
+
+          if (studentData.status === true) {
+            alert('この番号は既に受付済みです！');
+            document.getElementById('pNumInput').value = '';
+            document.getElementById('pNumInput').focus();
+            return;
+          }
+
+          currentStudent = studentData;
+
+          document.getElementById('confSchool').innerText = studentData.school;
+          document.getElementById('confName').innerText   = studentData.name;
+
+          let box = document.getElementById('confirmBox');
+          let titleNorm = document.getElementById('conf-title-normal');
+          let titleErr  = document.getElementById('conf-title-error');
+          let alert_el  = document.getElementById('mismatchAlert');
+          let okBtn     = document.getElementById('btnOk');
+
+          box.classList.remove('is-mismatch');
+          titleNorm.style.display = 'block'; titleErr.style.display  = 'none'; alert_el.style.display  = 'none';
+          okBtn.className = 'btn-ok'; 
+          currentStudent.isMismatch = false;
+
+          // ブース指定がある場合のチェック
+          if (config.currentRoom && studentData.room !== config.currentRoom) {
+            box.classList.add('is-mismatch');
+            titleNorm.style.display = 'none'; titleErr.style.display = 'block';
+            alert_el.innerText = `正しい案内先は【${studentData.room}ブース】です`; 
+            alert_el.style.display = 'block';
+            okBtn.className = 'btn-ok is-danger';
+            currentStudent.isMismatch = true;
+          }
+          
+          document.getElementById('confirmModal').classList.add('active');
+          setTimeout(() => okBtn.focus(), 50);
+        })
+        .catch((error) => {
+          console.error(error);
+          alert('通信エラーが発生しました。');
+          resetBtn();
+        });
+    }
+
+    function resetBtn() {
+      let btn = document.getElementById('check-btn');
+      btn.disabled = false; btn.innerText = '照会';
+    }
+
+    // 受付完了処理（Firebaseのstatusを更新）
+    function approve() {
+      if (!currentStudent) return;
+      if (currentStudent.isMismatch) { reset(); return; }
+
+      let okBtn = document.getElementById('btnOk');
+      let cancelBtn = document.getElementById('btnCancel');
+      okBtn.disabled = true; cancelBtn.disabled = true;
+      let prev = okBtn.innerText; okBtn.innerText = '更新中...';
+
+      db.ref('students/' + currentStudent.pNum).update({
+        status: true
+      })
+      .then(() => {
+        okBtn.disabled = false;
+        cancelBtn.disabled = false;
+        okBtn.innerText = 'OK';
+
+        let normArea = document.getElementById('ins-normal');
+        let misArea  = document.getElementById('ins-mismatch');
+        normArea.style.display = 'block'; misArea.style.display = 'none';
+        
+        document.getElementById('insSubLabel').innerText = '案内ブース';
+        document.getElementById('insRoom').innerText     = currentStudent.room;
+
+        closeModal('confirmModal');
+        document.getElementById('instructionModal').classList.add('active');
+        setTimeout(() => document.getElementById('btnNext').focus(), 50);
+      })
+      .catch((error) => {
+        console.error(error);
+        alert('更新エラーが発生しました。');
+        okBtn.disabled = false; cancelBtn.disabled = false; okBtn.innerText = prev;
+      });
+    }
+
+    function reset() {
+      closeModal('instructionModal'); closeModal('confirmModal');
+      document.getElementById('pNumInput').value = '';
+      currentStudent = null;
+      document.getElementById('pNumInput').focus();
+    }
+    
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    
+    updateBadge();
+  </script>
+</body>
+</html>
