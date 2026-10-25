@@ -1,192 +1,263 @@
-<!-- (ここより上は現在のHTML・CSSのままでOKです) -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>イベント受付システム</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <!-- ▼▼▼ ここから追加：Firebase SDKの読み込み ▼▼▼ -->
+    :root {
+      --blue:    #1a73e8;
+      --green:   #34a853;
+      --red:     #d93025;
+      --gray:    #5f6368;
+      --bg:      #f0f2f5;
+      --white:   #ffffff;
+      --shadow:  0 4px 16px rgba(0,0,0,0.15);
+    }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Sans', sans-serif;
+      background: var(--bg);
+      color: #333;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ヘッダー */
+    header {
+      background: #1e2a38;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    
+    #menu-btn {
+      background: none; border: none; color: white;
+      font-size: 24px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    }
+    #menu-btn span { font-size: 14px; font-weight: bold; }
+
+    #mode-badge {
+      background: rgba(26,115,232,0.25);
+      color: #8ab4f8;
+      border: 1px solid rgba(26,115,232,0.4);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 14px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    /* カメラエリア */
+    #camera-area {
+      flex: 1; 
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+    #camera-iframe {
+      width: 100%; height: 100%;
+      border: none;
+      display: none;
+    }
+    #camera-placeholder {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    }
+    #start-camera-btn {
+      background: var(--green); color: white; border: none; border-radius: 8px;
+      padding: 16px 40px; font-size: 18px; font-weight: bold; cursor: pointer;
+    }
+
+    /* 入力カード */
+    #input-section {
+      background: var(--white);
+      padding: 20px;
+      flex-shrink: 0;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+    .input-wrapper {
+      max-width: 500px;
+      margin: 0 auto;
+      display: flex; gap: 12px; align-items: stretch;
+    }
+    #pNumInput {
+      flex: 1;
+      font-size: 32px; padding: 12px 16px; text-align: center;
+      border: 3px solid #dadce0; border-radius: 10px; letter-spacing: 8px;
+      font-family: 'Courier New', monospace; outline: none;
+    }
+    #pNumInput:focus { border-color: var(--blue); }
+    #pNumInput.scanning { border-color: var(--green); background: #f0fff4; }
+    
+    #check-btn {
+      width: 100px; background: var(--blue); color: white; border: none;
+      border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;
+    }
+    #check-btn:disabled { background: #a8c7fa; cursor: not-allowed; }
+
+    /* サイドバー設定画面 */
+    #sidebar-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 998;
+    }
+    #sidebar {
+      position: fixed; top: 0; bottom: 0; left: -300px;
+      width: 280px; background: var(--bg); z-index: 999;
+      box-shadow: 4px 0 16px rgba(0,0,0,0.2);
+      transition: left 0.3s ease;
+      display: flex; flex-direction: column;
+    }
+    #sidebar.active { left: 0; }
+    
+    .sidebar-header {
+      background: var(--blue); color: white; padding: 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 18px; font-weight: bold;
+    }
+    .close-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
+    
+    .sidebar-content { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .config-group { display: flex; flex-direction: column; gap: 8px; }
+    .config-group label { font-size: 14px; font-weight: bold; color: var(--gray); }
+    .config-group select, .config-group input {
+      padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; outline: none;
+    }
+
+    /* モーダル */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+      justify-content: center; align-items: center; z-index: 1000; padding: 16px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: white; border-radius: 20px; padding: 28px; width: 100%; max-width: 440px;
+    }
+    .modal-box.is-mismatch { background: #fce8e6; border: 4px solid var(--red); }
+    .modal-title { font-size: 18px; font-weight: bold; color: var(--blue); margin-bottom: 16px; }
+    .modal-title.is-error { color: var(--red); font-size: 22px; }
+    .info-row { display: flex; align-items: baseline; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 20px; }
+    .info-row .lbl { font-size: 13px; color: var(--gray); font-weight: bold; width: 52px; flex-shrink: 0; }
+    .info-row .val { color: #111; font-weight: 500; }
+    .mismatch-alert { display: none; background: white; border: 2px dashed var(--red); border-radius: 8px; color: var(--red); font-size: 16px; font-weight: bold; padding: 10px 14px; margin: 14px 0 0; }
+    .modal-btns { display: flex; gap: 12px; margin-top: 20px; }
+    .btn-ok { flex: 1; padding: 13px; background: var(--blue); color: white; border: none; border-radius: 8px; font-size: 17px; font-weight: bold; cursor: pointer; }
+    .btn-ok.is-danger { background: var(--red); }
+    .btn-cancel { flex: 1; padding: 13px; background: #e8eaed; color: #444; border: none; border-radius: 8px; font-size: 17px; font-weight: bold; cursor: pointer; }
+    
+    .navi-header { font-size: 22px; font-weight: bold; color: var(--green); margin-bottom: 16px; }
+    .navi-header.is-error { color: var(--red); }
+    .navi-box { background: #f8f9fa; border: 2px solid #dadce0; border-radius: 14px; padding: 20px; margin-bottom: 20px; text-align: center; }
+    .navi-box.is-error { background: #fce8e6; border-color: var(--red); }
+    .navi-sub { font-size: 14px; color: var(--gray); font-weight: bold; margin-bottom: 8px; }
+    .navi-sub.is-error { color: var(--red); }
+    .navi-value { font-size: 52px; font-weight: bold; color: var(--blue); line-height: 1.1; }
+    .navi-value.is-error { color: var(--red); font-size: 32px; }
+    .btn-next { width: 100%; padding: 16px; background: var(--green); color: white; border: none; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <button id="menu-btn" onclick="openSidebar()">☰ <span>設定</span></button>
+    <div id="mode-badge">1回目 | 全ブース</div>
+  </header>
+
+  <div id="camera-area">
+    <div id="camera-placeholder">
+      <button id="start-camera-btn" onclick="startCamera()">📷 カメラを起動</button>
+    </div>
+    <iframe id="camera-iframe" allow="camera" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+  </div>
+
+  <div id="input-section">
+    <div class="input-wrapper">
+      <input
+        type="text" id="pNumInput"
+        maxlength="4" placeholder="0000"
+        inputmode="numeric"
+        onkeypress="if(event.key==='Enter') doCheck()"
+      >
+      <button id="check-btn" onclick="doCheck()">照会</button>
+    </div>
+  </div>
+
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <div id="sidebar">
+    <div class="sidebar-header">
+      受付設定
+      <button class="close-btn" onclick="closeSidebar()">×</button>
+    </div>
+    <div class="sidebar-content">
+      <div class="config-group">
+        <label>セッション</label>
+        <select id="configDay" onchange="updateBadge()">
+          <option value="1回目">1回目</option>
+          <option value="2回目">2回目</option>
+        </select>
+      </div>
+      <div class="config-group">
+        <label>自分の担当ブース (空欄で全ブース)</label>
+        <input type="text" id="configRoom" placeholder="例: 04" maxlength="3" oninput="updateBadge()">
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal-box" id="confirmBox">
+      <div id="conf-title-normal" class="modal-title">受付確認</div>
+      <div id="conf-title-error" class="modal-title is-error" style="display:none">⚠️ 場所が違います！</div>
+      <div class="info-row"><span class="lbl">学校</span><span class="val" id="confSchool"></span></div>
+      <div class="info-row"><span class="lbl">名前</span><span class="val" id="confName"></span></div>
+      <div id="mismatchAlert" class="mismatch-alert"></div>
+      <div class="modal-btns">
+        <button id="btnOk" class="btn-ok" onclick="approve()">OK</button>
+        <button id="btnCancel" class="btn-cancel" onclick="closeModal('confirmModal')">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="instructionModal" class="modal-overlay">
+    <div class="modal-box">
+      <div id="ins-normal">
+        <div class="navi-header">受付完了 案内してください</div>
+        <div class="navi-box">
+          <div class="navi-sub" id="insSubLabel">案内ブース</div>
+          <div class="navi-value"><span id="insRoom"></span>ブース</div>
+        </div>
+      </div>
+      <div id="ins-mismatch" style="display:none">
+        <div class="navi-header is-error">⚠️ 正しい場所へ案内してください</div>
+        <div class="navi-box is-error">
+          <div class="navi-sub is-error">正しい受付場所</div>
+          <div class="navi-value is-error" id="insCorrectLocation"></div>
+        </div>
+      </div>
+      <button id="btnNext" class="btn-next" onclick="reset()">OK（次の受付へ）</button>
+    </div>
+  </div>
+
+  <!-- ▼ Firebase SDK の読み込み ▼ -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   
   <script>
-    // ▼▼▼ Firebaseの設定（先ほどのURLに合わせて書き換えてください） ▼▼▼
+    // ▼▼▼ FirebaseのURLをご自身のものに書き換えてください（末尾の / を忘れずに） ▼▼▼
     const firebaseConfig = {
-      databaseURL: "https://あなたのアドレス.firebasedatabase.app/"
+      databaseURL: "https://あなたのアドレス.firebasedatabase.app/" 
     };
-    
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
     // Firebaseの初期化
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     
     let currentStudent = null;
-
-    // --- (エンターキーやサイドバーの開閉処理などは現在のままでOK) ---
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        let confirmModal = document.getElementById('confirmModal');
-        let instructionModal = document.getElementById('instructionModal');
-        if (instructionModal.classList.contains('active')) {
-          e.preventDefault(); reset();
-        } else if (confirmModal.classList.contains('active')) {
-          e.preventDefault();
-          let okBtn = document.getElementById('btnOk');
-          if (!okBtn.disabled) approve();
-        }
-      }
-    });
-
-    function openSidebar() {
-      document.getElementById('sidebar').classList.add('active');
-      document.getElementById('sidebar-overlay').style.display = 'block';
-    }
-    function closeSidebar() {
-      document.getElementById('sidebar').classList.remove('active');
-      document.getElementById('sidebar-overlay').style.display = 'none';
-    }
-    function updateBadge() {
-      let day  = document.getElementById('configDay').value;
-      let room = document.getElementById('configRoom').value.trim();
-      document.getElementById('mode-badge').innerText = day + ' | ' + (room ? room + 'ブース' : '全ブース');
-    }
-
-    // メッセージ受信（QR読み取り時）
-    window.addEventListener('message', function(e) {
-      if (!e.data || e.data.type !== 'QR_SCANNED') return;
-      let num = String(e.data.num).trim();
-      if (!/^\d{4}$/.test(num)) return;
-
-      document.getElementById('pNumInput').value = num;
-      document.getElementById('pNumInput').classList.add('scanning');
-      setTimeout(() => document.getElementById('pNumInput').classList.remove('scanning'), 800);
-      doCheck();
-    });
-
-    // ----------------------------------------------------
-    // ★ ここから下が爆速化のキモ：Firebaseとの直接通信 ★
-    // ----------------------------------------------------
-
-    // 照会処理（検索）
-    function doCheck() {
-      let pNum = document.getElementById('pNumInput').value.trim();
-      if (!pNum || pNum.length < 4) return;
-      
-      let btn = document.getElementById('check-btn');
-      btn.disabled = true; btn.innerText = '照会中...';
-
-      let config = {
-        currentDay:  document.getElementById('configDay').value,
-        currentRoom: document.getElementById('configRoom').value.trim()
-      };
-
-      // Firebaseから直接データを取得（爆速）
-      db.ref('students/' + pNum).once('value')
-        .then((snapshot) => {
-          resetBtn();
-          const studentData = snapshot.val();
-
-          // 該当データがない場合
-          if (!studentData) {
-            alert('該当する番号が見つかりません。');
-            document.getElementById('pNumInput').value = '';
-            document.getElementById('pNumInput').focus();
-            return;
-          }
-
-          // 既に受付済みの場合
-          if (studentData.status === true) {
-            alert('この番号は既に受付済みです！');
-            document.getElementById('pNumInput').value = '';
-            document.getElementById('pNumInput').focus();
-            return;
-          }
-
-          // 検索結果を変数に保持
-          currentStudent = studentData;
-
-          // 確認画面へデータをセット
-          document.getElementById('confSchool').innerText = studentData.school;
-          document.getElementById('confName').innerText   = studentData.name;
-
-          let box = document.getElementById('confirmBox');
-          let titleNorm = document.getElementById('conf-title-normal');
-          let titleErr  = document.getElementById('conf-title-error');
-          let alert_el  = document.getElementById('mismatchAlert');
-          let okBtn     = document.getElementById('btnOk');
-
-          box.classList.remove('is-mismatch');
-          titleNorm.style.display = 'block'; titleErr.style.display  = 'none'; alert_el.style.display  = 'none';
-          okBtn.className = 'btn-ok'; 
-          currentStudent.isMismatch = false;
-
-          // ブースが指定されていて、名簿のブースと違う場合の警告
-          if (config.currentRoom && studentData.room !== config.currentRoom) {
-            box.classList.add('is-mismatch');
-            titleNorm.style.display = 'none'; titleErr.style.display = 'block';
-            alert_el.innerText = `正しい案内先は【${studentData.room}ブース】です`; 
-            alert_el.style.display = 'block';
-            okBtn.className = 'btn-ok is-danger';
-            currentStudent.isMismatch = true;
-          }
-          
-          document.getElementById('confirmModal').classList.add('active');
-          setTimeout(() => okBtn.focus(), 50);
-        })
-        .catch((error) => {
-          console.error(error);
-          alert('通信エラーが発生しました。');
-          resetBtn();
-        });
-    }
-
-    function resetBtn() {
-      let btn = document.getElementById('check-btn');
-      btn.disabled = false; btn.innerText = '照会';
-    }
-
-    // 受付完了処理（上書き保存）
-    function approve() {
-      if (!currentStudent) return;
-      if (currentStudent.isMismatch) { reset(); return; }
-
-      let okBtn = document.getElementById('btnOk');
-      let cancelBtn = document.getElementById('btnCancel');
-      okBtn.disabled = true; cancelBtn.disabled = true;
-      let prev = okBtn.innerText; okBtn.innerText = '更新中...';
-
-      // Firebaseの status を true に更新（爆速）
-      db.ref('students/' + currentStudent.pNum).update({
-        status: true
-      })
-      .then(() => {
-        // 更新成功時の処理
-        okBtn.disabled = false;
-        cancelBtn.disabled = false;
-        okBtn.innerText = 'OK';
-
-        let normArea = document.getElementById('ins-normal');
-        let misArea  = document.getElementById('ins-mismatch');
-        normArea.style.display = 'block'; misArea.style.display = 'none';
-        
-        document.getElementById('insSubLabel').innerText = '案内ブース';
-        document.getElementById('insRoom').innerText     = currentStudent.room;
-
-        closeModal('confirmModal');
-        document.getElementById('instructionModal').classList.add('active');
-        setTimeout(() => document.getElementById('btnNext').focus(), 50);
-      })
-      .catch((error) => {
-        console.error(error);
-        alert('更新エラーが発生しました。');
-        okBtn.disabled = false; cancelBtn.disabled = false; okBtn.innerText = prev;
-      });
-    }
-
-    function reset() {
-      closeModal('instructionModal'); closeModal('confirmModal');
-      document.getElementById('pNumInput').value = '';
-      currentStudent = null;
-      document.getElementById('pNumInput').focus();
-    }
-    
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-    updateBadge();
-
-  </script>
-</body>
-</html>
