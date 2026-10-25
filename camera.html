@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QRスキャナー</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    #video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    canvas { display: none; }
+
+    /* スキャン枠オーバーレイ */
+    #overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    #scan-frame {
+      width: 60vw; max-width: 350px; 
+      aspect-ratio: 1; /* 正方形 */
+      border: 3px solid #34a853;
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+      position: relative;
+    }
+    #scan-frame::before, #scan-frame::after,
+    #corner-bl, #corner-br {
+      content: ''; position: absolute;
+      width: 24px; height: 24px;
+      border-color: #34a853; border-style: solid;
+    }
+    #scan-frame::before { top: -3px; left: -3px; border-width: 5px 0 0 5px; border-radius: 6px 0 0 0; }
+    #scan-frame::after  { top: -3px; right: -3px; border-width: 5px 5px 0 0; border-radius: 0 6px 0 0; }
+    #corner-bl { bottom: -3px; left: -3px; border-width: 0 0 5px 5px; border-radius: 0 0 0 6px; }
+    #corner-br { bottom: -3px; right: -3px; border-width: 0 5px 5px 0; border-radius: 0 0 6px 0; }
+
+    #scan-line {
+      position: absolute; left: 0; right: 0; top: 0;
+      height: 2px;
+      background: linear-gradient(to right, transparent, #34a853, transparent);
+      animation: scanMove 1.8s ease-in-out infinite;
+    }
+    @keyframes scanMove {
+      0%   { top: 0%; opacity: 1; }
+      90%  { top: 100%; opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    #status-label {
+      margin-top: 24px; color: rgba(255,255,255,0.9);
+      font-size: 14px; font-weight: bold; font-family: sans-serif;
+      background: rgba(0,0,0,0.6); padding: 8px 18px; border-radius: 20px;
+    }
+
+    /* カメラ切り替えUI */
+    #camera-controls {
+      position: absolute; top: 12px; left: 12px;
+      z-index: 50;
+    }
+    #camera-select {
+      background: rgba(0,0,0,0.7); color: white;
+      border: 1px solid rgba(255,255,255,0.4); border-radius: 6px;
+      padding: 8px 12px; font-size: 14px; outline: none;
+      cursor: pointer; max-width: 200px;
+    }
+
+    /* 読み取り成功フラッシュ */
+    #found-flash {
+      display: none; position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: #34a853; color: white;
+      font-size: 52px; font-weight: bold; font-family: 'Courier New', monospace;
+      padding: 24px 48px; border-radius: 16px; letter-spacing: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 100;
+      animation: popIn 0.15s ease-out;
+    }
+    @keyframes popIn {
+      from { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+      to   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+    }
+
+    #error-msg {
+      display: none; position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: #d93025; color: white; font-size: 15px;
+      padding: 20px 28px; border-radius: 12px; text-align: center;
+      max-width: 80%; line-height: 1.6; z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div id="camera-controls">
+    <select id="camera-select" onchange="switchCamera()"></select>
+  </div>
+
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+
+  <div id="overlay">
+    <div id="scan-frame">
+      <div id="scan-line"></div>
+      <div id="corner-bl"></div>
+      <div id="corner-br"></div>
+    </div>
+    <div id="status-label" id="status-label">QRコードをかざしてください</div>
+  </div>
+
+  <div id="found-flash"></div>
+  <div id="error-msg"></div>
+
+  <script>
+    let scanning = true;
+    let currentStream = null;
+
+    // 初回起動：カメラの許可を取ってからデバイス一覧を取得
+    async function initCamera() {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        
+        const select = document.getElementById('camera-select');
+        select.innerHTML = '';
+        
+        if (videoDevices.length === 0) throw new Error('カメラが見つかりません');
+
+        videoDevices.forEach((device, index) => {
+          let option = document.createElement('option');
+          option.value = device.deviceId;
+          option.text = device.label || 'カメラ ' + (index + 1);
+          select.appendChild(option);
+        });
+
+        let defaultCam = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('背面'));
+        if (defaultCam) select.value = defaultCam.deviceId;
+
+        startCamera(select.value);
+
+      } catch (err) {
+        showError(err);
+      }
+    }
+
+    function startCamera(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      
+      const constraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" },
+        audio: false
+      };
+
+      navigator.mediaDevices.getUserMedia(constraints)
+      .then(function(stream) {
+        currentStream = stream;
+        let v = document.getElementById('video');
+        v.srcObject = stream;
+        v.play();
+        requestAnimationFrame(tick);
+      })
+      .catch(showError);
+    }
+
+    function switchCamera() {
+      let deviceId = document.getElementById('camera-select').value;
+      startCamera(deviceId);
+    }
+
+    function showError(err) {
+      let msg = 'カメラの起動に失敗しました: ' + err.message;
+      let el = document.getElementById('error-msg');
+      el.innerText = msg;
+      el.style.display = 'block';
+    }
+
+    function tick() {
+      if (!scanning) return;
+      let v = document.getElementById('video');
+      let c = document.getElementById('canvas');
+      if (v.readyState === v.HAVE_ENOUGH_DATA) {
+        c.width  = v.videoWidth;
+        c.height = v.videoHeight;
+        let ctx = c.getContext('2d');
+        ctx.drawImage(v, 0, 0, c.width, c.height);
+        let img  = ctx.getImageData(0, 0, c.width, c.height);
+        
+        let code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+        if (code) {
+          let num = code.data.trim();
+          
+          // ▼ 修正：1桁〜4桁の数字を許容する
+          if (/^\d{1,4}$/.test(num)) {
+            // ▼ 追加：4桁になるように先頭を0で埋める
+            num = String(num).padStart(4, '0');
+            
+            scanning = false;
+            let flash = document.getElementById('found-flash');
+            
+            // 画面上にも0埋めされた状態でピカッと表示される
+            flash.innerText = num;
+            flash.style.display = 'block';
+            
+            // 親画面へ0埋め済みの4桁を送信
+            window.parent.postMessage({ type: 'QR_SCANNED', num: num }, '*');
+
+            setTimeout(function() {
+              flash.style.display = 'none';
+              scanning = true;
+              requestAnimationFrame(tick);
+            }, 1500);
+            return;
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // 起動
+    initCamera();
+  </script>
+</body>
+</html>
