@@ -21,35 +21,43 @@
   <style>
     body { background-color: #f0f2f5; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
     
-    /* ログイン画面のスタイル */
     #login-screen { display: flex; flex-direction: column; justify-content: center; height: 100vh; padding: 20px; }
-    
-    /* メイン画面のレイアウト（全画面） */
     #main-screen { display: none; flex-direction: column; height: 100vh; width: 100%; }
     
-    /* カメラエリア（上部を最大化） */
     #camera-area { flex: 1; background: #000; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; display: none; }
     
-    /* カメラ切り替えボタン */
     #switch-camera-btn { position: absolute; top: 15px; right: 15px; display: none; z-index: 10; }
     
-    /* 下部の入力エリア */
     #bottom-panel { background: #fff; padding: 15px 20px; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); z-index: 10; }
     .qr-result { font-size: 1.1rem; font-weight: bold; color: #1976d2; margin-bottom: 10px; text-align: center; }
     
-    /* 手入力フィールドのデザイン調整 */
     .manual-input-wrapper { display: flex; gap: 10px; align-items: center; }
     .manual-input-wrapper input { flex: 1; font-size: 1.5rem !important; letter-spacing: 2px; text-align: center; margin: 0 !important; border: 2px solid #ccc !important; border-radius: 8px !important; padding: 5px !important; height: 3rem !important; box-sizing: border-box !important;}
     .manual-input-wrapper input:focus { border-color: #1976d2 !important; box-shadow: none !important; }
     .manual-input-wrapper button { height: 3rem; border-radius: 8px; font-weight: bold; width: 100px; }
+
+    /* モーダルのカスタマイズ */
+    .modal { border-radius: 16px; max-width: 400px; overflow: hidden; }
+    .modal-content { text-align: center; padding: 30px 20px 20px !important; }
+    .modal-title { font-weight: bold; margin-bottom: 20px; font-size: 1.8rem; }
+    .modal-text { font-size: 1.3rem; line-height: 1.6; text-align: left; }
+    
+    /* 案内画面のスタイル */
+    .info-row { display: flex; align-items: baseline; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 1.2rem; }
+    .info-row .lbl { font-size: 0.9rem; color: #757575; font-weight: bold; width: 60px; flex-shrink: 0; }
+    .info-row .val { color: #111; font-weight: bold; flex: 1; }
+    
+    .room-number-large { font-size: 3.5rem; font-weight: bold; color: #d32f2f; line-height: 1; margin: 15px 0; display: block; text-align: center; }
+    
+    /* モーダルのボタンエリアを2つ横並びに */
+    .modal-btns { display: flex; gap: 12px; margin-top: 20px; padding: 0 20px 20px; }
+    .btn-action { flex: 1; padding: 0 10px; border-radius: 8px; font-weight: bold; height: 45px; line-height: 45px; font-size: 1.1rem; }
   </style>
 </head>
 <body>
 
-  <!-- ========================================== -->
   <!-- 1. ログイン画面 -->
-  <!-- ========================================== -->
   <div id="login-screen">
     <div class="row" style="margin: 0; width: 100%; max-width: 500px; margin-left: auto; margin-right: auto;">
       <div class="card" style="border-radius: 12px;">
@@ -76,37 +84,41 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
   <!-- 2. メイン画面 -->
-  <!-- ========================================== -->
   <div id="main-screen">
-    
-    <!-- ナビゲーションバー -->
     <nav class="blue darken-2">
       <div class="nav-wrapper px-2">
         <a href="#" data-target="slide-out" class="sidenav-trigger show-on-large" style="display: block;"><i class="material-icons">menu</i></a>
         <span class="brand-logo center" style="font-size: 1.2rem; font-weight: bold;">受付スキャン</span>
         <ul class="right">
           <li>
-            <span style="font-weight: bold; padding-right: 15px; font-size: 1.1rem;">
+            <span style="font-weight: bold; padding-right: 15px; font-size: 1.1rem; color: #fff;">
               <i class="material-icons left" style="line-height: inherit; margin-right: 5px;">place</i>
-              <span id="header-booth-id"></span>
+              <span id="header-booth-id">全ブース</span>
             </span>
           </li>
         </ul>
       </div>
     </nav>
 
-    <!-- ハンバーガーメニュー（サイドバー） -->
+    <!-- サイドバー -->
     <ul id="slide-out" class="sidenav">
       <li>
         <div class="user-view">
           <div class="background blue darken-1"></div>
-          <a href="#name"><span class="white-text name" style="font-size: 1.2rem; font-weight: bold;">担当ブース情報</span></a>
-          <a href="#email"><span class="white-text email" id="sidebar-booth-id" style="font-size: 1.5rem;"></span></a>
+          <a href="#name"><span class="white-text name" style="font-size: 1.2rem; font-weight: bold;">ログインID</span></a>
+          <a href="#email"><span class="white-text email" id="sidebar-booth-id" style="font-size: 1.2rem;"></span></a>
         </div>
       </li>
-      <li><a class="subheader">システムメニュー</a></li>
+      <li><a class="subheader">受付設定 (この端末の担当)</a></li>
+      <li style="padding: 0 32px; margin-top: 10px;">
+        <div class="input-field">
+          <input id="config-room" type="text" placeholder="例: 04 (空欄で全ブース)">
+          <label for="config-room" class="active">担当ブース番号</label>
+        </div>
+        <p class="grey-text" style="font-size: 0.8rem; line-height: 1.2; margin-top: -10px;">※指定したブース以外の生徒が来た場合に警告を出します。</p>
+      </li>
+      <li><div class="divider"></div></li>
       <li><a href="#!" id="logout-btn"><i class="material-icons">logout</i>ログアウトする</a></li>
     </ul>
 
@@ -115,41 +127,44 @@
       <button class="btn-large waves-effect waves-light green darken-1" id="start-camera-btn" style="border-radius: 20px; z-index: 5;">
         <i class="material-icons left">camera_alt</i>カメラを起動
       </button>
-      
       <video id="video" playsinline autoplay></video>
       <canvas id="canvas" hidden></canvas>
-      
-      <!-- カメラ切り替えボタン -->
       <button id="switch-camera-btn" class="btn-floating btn-large waves-effect waves-light grey darken-3">
         <i class="material-icons">cameraswitch</i>
       </button>
     </div>
 
-    <!-- 下部パネル（結果表示 ＆ 手入力） -->
+    <!-- 下部パネル -->
     <div id="bottom-panel">
       <div id="qr-result" class="qr-result">カメラを起動してください</div>
-      
-      <!-- 手入力フォーム -->
       <div class="manual-input-wrapper">
         <input type="text" id="manual-input" placeholder="学籍番号 (例: 1234)" inputmode="numeric" maxlength="4">
         <button id="manual-submit-btn" class="btn waves-effect waves-light blue darken-1">照会</button>
       </div>
     </div>
-
   </div>
 
-  <!-- jsQRの読み込み -->
+  <!-- ★ 3. 確認＆結果表示用モーダル -->
+  <div id="confirm-modal" class="modal">
+    <div class="modal-content">
+      <div id="modal-title" class="modal-title"></div>
+      <div id="modal-body" class="modal-text"></div>
+    </div>
+    <!-- ボタンエリア（Javascriptで中身を書き換えます） -->
+    <div id="modal-btns-area" class="modal-btns">
+      <!-- ここにキャンセル/受付完了ボタンが入ります -->
+    </div>
+  </div>
+
+  <!-- スクリプト群 -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <!-- Materialize CSSのJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 
-  <!-- ========================================== -->
-  <!-- Firebase & アプリケーションロジック -->
-  <!-- ========================================== -->
+  <!-- Firebase & ロジック -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-    import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import { getDatabase, ref, get, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: window.MY_API_KEY,
@@ -162,48 +177,65 @@
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-    // DOM要素
     const loginScreen = document.getElementById('login-screen');
     const mainScreen = document.getElementById('main-screen');
     const loginBtn = document.getElementById('login-btn');
     const logoutBtn = document.getElementById('logout-btn');
     const errorMsg = document.getElementById('login-error');
+    
     const headerBoothId = document.getElementById('header-booth-id');
     const sidebarBoothId = document.getElementById('sidebar-booth-id');
+    const configRoomInput = document.getElementById('config-room');
     
-    // カメラ関連要素
     const video = document.getElementById('video');
     const canvasElement = document.getElementById('canvas');
     const canvasContext = canvasElement.getContext('2d', { willReadFrequently: true });
     const startCameraBtn = document.getElementById('start-camera-btn');
     const switchCameraBtn = document.getElementById('switch-camera-btn');
     const qrResultText = document.getElementById('qr-result');
-    
-    // 手入力関連
     const manualInput = document.getElementById('manual-input');
     const manualSubmitBtn = document.getElementById('manual-submit-btn');
 
     let requestAnimationFrameId = null;
     let currentStream = null;
-    let useFrontCamera = false; // 初期状態は背面カメラ(false)
-
+    let useFrontCamera = false; 
     let mySessionToken = "";
     let currentBoothId = "";
+    let isProcessing = false; 
+    let activeStudentPNum = ""; // 現在確認中の生徒のIDを保持
 
-    // ハンバーガーメニューの初期化
+    // Materialize初期化
     document.addEventListener('DOMContentLoaded', function() {
-      var elems = document.querySelectorAll('.sidenav');
-      M.Sidenav.init(elems, { edge: 'left' });
+      M.Sidenav.init(document.querySelectorAll('.sidenav'), { edge: 'left' });
+      // モーダル設定
+      M.Modal.init(document.querySelectorAll('.modal'), {
+        onCloseEnd: function() {
+          // モーダルが完全に閉じた後のリセット処理
+          isProcessing = false;
+          activeStudentPNum = "";
+          manualInput.value = "";
+          manualInput.focus();
+          qrResultText.innerText = "次のQRコードをかざしてください";
+          if (video.srcObject) {
+            requestAnimationFrameId = requestAnimationFrame(scanQR);
+          }
+        },
+        dismissible: false // 枠外クリックで閉じないようにする
+      });
+    });
+
+    configRoomInput.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      headerBoothId.innerText = val ? `担当: ${val} ブース` : "全ブース担当";
     });
 
     // --------------------------------------------------
-    // ログイン監視 ＆ 許可時間チェック
+    // ログイン監視
     // --------------------------------------------------
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         currentBoothId = user.email.split('@')[0];
-        headerBoothId.innerText = currentBoothId + " ブース";
-        sidebarBoothId.innerText = "ID: " + currentBoothId;
+        sidebarBoothId.innerText = currentBoothId;
         await checkPermissionAndStartSession(currentBoothId);
       } else {
         stopCamera();
@@ -216,40 +248,33 @@
       const id = document.getElementById('booth-id').value.trim();
       const pass = document.getElementById('booth-pass').value.trim();
       errorMsg.innerText = "";
+      if (!id || !pass) { errorMsg.innerText = "入力してください。"; return; }
+      if (window.MY_API_KEY === "YOUR_API_KEY") { errorMsg.innerText = "API_KEYが未設定です。"; return; }
       
-      if (!id || !pass) { errorMsg.innerText = "IDとパスワードを入力してください。"; return; }
-      if (window.MY_API_KEY === "YOUR_API_KEY") { errorMsg.innerText = "HTML一番上の API_KEY が設定されていません。"; return; }
-      
-      const email = id + "@event.local";
-      loginBtn.innerHTML = "ログイン中...<i class='material-icons right'>hourglass_empty</i>";
-      
-      signInWithEmailAndPassword(auth, email, pass)
+      loginBtn.innerHTML = "ログイン中...";
+      signInWithEmailAndPassword(auth, id + "@event.local", pass)
         .then(() => loginBtn.innerHTML = "ログイン<i class='material-icons right'>login</i>")
-        .catch((err) => {
+        .catch(() => {
           loginBtn.innerHTML = "ログイン<i class='material-icons right'>login</i>";
-          errorMsg.innerText = "IDまたはパスワードが間違っています。";
+          errorMsg.innerText = "IDまたはパスワードが違います。";
         });
     });
 
     logoutBtn.addEventListener('click', () => {
-      // ログアウト時にサイドバーを閉じる
-      var instance = M.Sidenav.getInstance(document.getElementById('slide-out'));
-      if(instance) instance.close();
+      M.Sidenav.getInstance(document.getElementById('slide-out')).close();
       signOut(auth);
     });
 
     async function checkPermissionAndStartSession(boothId) {
       const snapshot = await get(ref(db, 'config/booths/' + boothId));
-      if (!snapshot.exists()) {
-        alert("ブースの設定データが見つかりません。"); signOut(auth); return;
-      }
+      if (!snapshot.exists()) { alert("設定データが見つかりません。"); signOut(auth); return; }
       const config = snapshot.val();
       const now = new Date();
       const todayStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0');
       const nowTimeStr = String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0');
 
       if (config.date !== todayStr || nowTimeStr < config.startTime || nowTimeStr > config.endTime) {
-        alert(`現在は利用時間外です。\n許可日: ${config.date}\n時間: ${config.startTime}〜${config.endTime}`);
+        alert(`利用時間外です。\n許可日: ${config.date}\n時間: ${config.startTime}〜${config.endTime}`);
         signOut(auth); return;
       }
 
@@ -261,60 +286,171 @@
       onValue(ref(db, 'config/booths/' + boothId + '/activeToken'), (snapshot) => {
         const dbToken = snapshot.val();
         if (dbToken && dbToken !== mySessionToken) {
-          alert("別の端末でログインされたため、ログアウトしました。");
-          signOut(auth);
+          alert("別端末でログインされたためログアウトしました。"); signOut(auth);
         }
       });
     }
 
     // --------------------------------------------------
-    // 手入力の処理
+    // 生徒データの照会 ＆ ★確認画面の表示
     // --------------------------------------------------
-    manualSubmitBtn.addEventListener('click', processManualInput);
-    manualInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') processManualInput();
-    });
+    async function processStudent(pNum) {
+      if (isProcessing) return;
+      isProcessing = true;
+      activeStudentPNum = pNum; 
 
-    function processManualInput() {
-      const val = manualInput.value.trim();
-      if (!val) return;
+      qrResultText.innerText = "照会中...";
       
-      qrResultText.innerText = "手入力: " + val + " を照会中...";
-      
-      // ===== ここにFirebaseやGASへの送信処理が入ります =====
-      // ※現在はテスト用として2秒後にリセットします
-      setTimeout(() => {
-        qrResultText.innerText = "次のQRコードまたは番号を入力してください";
-        manualInput.value = "";
-      }, 2000);
+      try {
+        const snapshot = await get(ref(db, 'students/' + pNum));
+        if (!snapshot.exists()) {
+          showErrorModal(`学籍番号「<b>${pNum}</b>」のデータが見つかりません。`);
+          return;
+        }
+
+        const student = snapshot.val();
+        
+        // すでに受付完了しているかチェック（オプション・必要に応じて）
+        if (student.status === true) {
+          showErrorModal(`${student.name} さんは<br><b>既に受付済み</b>です。`);
+          return;
+        }
+
+        const configuredRoom = configRoomInput.value.trim();
+
+        // 【エラー】担当ブースが設定されていて、生徒の部屋と一致しない場合
+        if (configuredRoom && student.room !== configuredRoom) {
+          showMismatchModal(student);
+        } 
+        // 【正常】部屋が合っている（または「全ブース担当」）場合
+        else {
+          showConfirmModal(student);
+        }
+      } catch (e) {
+        showErrorModal(`データの取得に失敗しました。<br>${e.message}`);
+      }
     }
 
     // --------------------------------------------------
-    // QRコードカメラ読み取り ＆ 切り替え機能
+    // 各種モーダルの表示関数
+    // --------------------------------------------------
+    
+    // 1. エラー用のモーダル（OKボタンのみ）
+    function showErrorModal(htmlMessage) {
+      const titleEl = document.getElementById('modal-title');
+      titleEl.className = "modal-title red-text";
+      titleEl.innerText = "エラー";
+      document.getElementById('modal-body').innerHTML = `<p>${htmlMessage}</p>`;
+      
+      document.getElementById('modal-btns-area').innerHTML = `
+        <button class="modal-close btn waves-effect waves-light grey lighten-1 btn-action" style="color:#333;">閉じる</button>
+      `;
+      M.Modal.getInstance(document.getElementById('confirm-modal')).open();
+    }
+
+    // 2. ブース間違いのモーダル（案内用・OKボタンのみ）
+    function showMismatchModal(student) {
+      const titleEl = document.getElementById('modal-title');
+      titleEl.className = "modal-title red-text";
+      titleEl.innerHTML = "⚠️ 場所が違います！";
+      
+      document.getElementById('modal-body').innerHTML = `
+        <div class="info-row"><span class="lbl">学校</span><span class="val">${student.school}</span></div>
+        <div class="info-row"><span class="lbl">名前</span><span class="val">${student.name}</span></div>
+        <div style="margin-top: 15px; border: 2px dashed #d32f2f; border-radius: 8px; padding: 10px; background: #ffebee;">
+          <span style="font-size:0.9rem; color:#d32f2f; font-weight:bold;">正しい受付ブースへ案内してください</span>
+          <span class="room-number-large">${student.room}</span>
+        </div>
+      `;
+      
+      document.getElementById('modal-btns-area').innerHTML = `
+        <button class="modal-close btn waves-effect waves-light grey lighten-1 btn-action" style="color:#333;">閉じる</button>
+      `;
+      M.Modal.getInstance(document.getElementById('confirm-modal')).open();
+    }
+
+    // 3. 【重要】受付確認のモーダル（キャンセル / 受付完了 ボタン）
+    function showConfirmModal(student) {
+      const titleEl = document.getElementById('modal-title');
+      titleEl.className = "modal-title blue-text text-darken-2";
+      titleEl.innerHTML = "受付確認";
+      
+      document.getElementById('modal-body').innerHTML = `
+        <div class="info-row"><span class="lbl">学校</span><span class="val">${student.school}</span></div>
+        <div class="info-row"><span class="lbl">名前</span><span class="val">${student.name}</span></div>
+        <div class="info-row"><span class="lbl">ブース</span><span class="val" style="color:#2e7d32; font-size:1.5rem;">${student.room}</span></div>
+      `;
+      
+      document.getElementById('modal-btns-area').innerHTML = `
+        <button class="modal-close btn waves-effect waves-light grey lighten-2 btn-action" style="color:#333;">キャンセル</button>
+        <button id="submit-accept-btn" class="btn waves-effect waves-light blue darken-1 btn-action">受付完了する</button>
+      `;
+      
+      // 受付完了ボタンが押された時の処理をバインド
+      document.getElementById('submit-accept-btn').addEventListener('click', finalizeAcceptance);
+      
+      M.Modal.getInstance(document.getElementById('confirm-modal')).open();
+    }
+
+    // --------------------------------------------------
+    // ★ Firebaseへのデータ更新（受付確定）処理
+    // --------------------------------------------------
+    async function finalizeAcceptance() {
+      const btn = document.getElementById('submit-accept-btn');
+      btn.disabled = true;
+      btn.innerText = "通信中...";
+
+      try {
+        // Firebaseの status を true に更新！
+        await update(ref(db, 'students/' + activeStudentPNum), { status: true });
+        
+        // 成功したら完了画面に切り替え
+        document.getElementById('modal-title').className = "modal-title green-text text-darken-2";
+        document.getElementById('modal-title').innerHTML = "受付完了しました";
+        
+        // ボタンを「次へ」の1つだけに変更
+        document.getElementById('modal-btns-area').innerHTML = `
+          <button class="modal-close btn waves-effect waves-light green darken-1 btn-action">OK (次へ)</button>
+        `;
+      } catch (e) {
+        btn.disabled = false;
+        btn.innerText = "受付完了する";
+        alert("更新に失敗しました: " + e.message);
+      }
+    }
+
+
+    // --------------------------------------------------
+    // 手入力の処理
+    // --------------------------------------------------
+    manualSubmitBtn.addEventListener('click', () => {
+      const val = manualInput.value.trim();
+      if (val) processStudent(val);
+    });
+    manualInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const val = manualInput.value.trim();
+        if (val) processStudent(val);
+      }
+    });
+
+    // --------------------------------------------------
+    // QRコードカメラ処理
     // --------------------------------------------------
     startCameraBtn.addEventListener('click', () => {
       startCameraBtn.style.display = "none";
-      qrResultText.innerText = "カメラを起動中...";
       startCamera();
     });
 
     switchCameraBtn.addEventListener('click', () => {
-      useFrontCamera = !useFrontCamera; // イン/アウトを反転
-      qrResultText.innerText = "カメラを切り替え中...";
+      useFrontCamera = !useFrontCamera;
       startCamera();
     });
 
     function startCamera() {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
+      if (currentStream) currentStream.getTracks().forEach(track => track.stop());
       
-      // useFrontCamera が true ならインカメラ(user)、false なら背面カメラ(environment)
-      const constraints = {
-        video: { facingMode: (useFrontCamera ? "user" : "environment") }
-      };
-
-      navigator.mediaDevices.getUserMedia(constraints)
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: (useFrontCamera ? "user" : "environment") } })
         .then(function(stream) {
           currentStream = stream;
           video.srcObject = stream;
@@ -328,12 +464,12 @@
         })
         .catch(function(err) {
           qrResultText.innerText = "カメラの起動に失敗しました。カメラ切り替えをお試しください。";
-          switchCameraBtn.style.display = "block"; // エラー時でも切り替えボタンは出しておく
+          switchCameraBtn.style.display = "block"; 
         });
     }
 
     function scanQR() {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      if (!isProcessing && video.readyState === video.HAVE_ENOUGH_DATA) {
         canvasElement.height = video.videoHeight;
         canvasElement.width = video.videoWidth;
         canvasContext.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
@@ -341,27 +477,18 @@
         const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
-        if (code) {
-          qrResultText.innerText = "読み取り成功: " + code.data;
-          
-          // ===== ここにFirebaseやGASへの送信処理が入ります =====
-
-          // 連続で読み取らないように2秒ストップ
-          setTimeout(() => {
-             requestAnimationFrameId = requestAnimationFrame(scanQR);
-             qrResultText.innerText = "次のQRコードをかざしてください";
-          }, 2000);
-          return;
+        if (code && code.data.trim().length > 0) {
+          processStudent(code.data.trim());
+          return; 
         }
       }
-      requestAnimationFrameId = requestAnimationFrame(scanQR);
+      if (!isProcessing) {
+        requestAnimationFrameId = requestAnimationFrame(scanQR);
+      }
     }
 
     function stopCamera() {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-        currentStream = null;
-      }
+      if (currentStream) currentStream.getTracks().forEach(track => track.stop());
       if (requestAnimationFrameId) cancelAnimationFrame(requestAnimationFrameId);
       video.style.display = "none";
       switchCameraBtn.style.display = "none";
