@@ -4,7 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>受付システム</title>
-  
+
+  <!-- ========================================================= -->
+  <!-- ▼▼▼ 初期設定：ここだけ書き換えてください ▼▼▼ -->
+  <!-- ========================================================= -->
+  <script>
+    window.MY_API_KEY = "AIzaSyB8p3dqiw2mmvyFxV6-CvahbNAh2r0LYuc";
+    window.MY_PROJECT_ID = "uketuke-ai-cafe";
+  </script>
+  <!-- ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ -->
+
   <!-- Material Design 関連の読み込み -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
@@ -96,12 +105,12 @@
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
     import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // ▼▼▼ 先ほど取得した本物のAPIキーに書き換えてください ▼▼▼
+    // 冒頭で設定した変数を自動で組み込みます
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      apiKey: window.MY_API_KEY,
+      authDomain: window.MY_PROJECT_ID + ".firebaseapp.com",
       databaseURL: "https://uketuke-ai-cafe-default-rtdb.asia-southeast1.firebasedatabase.app/",
-      projectId: "YOUR_PROJECT_ID",
+      projectId: window.MY_PROJECT_ID,
     };
 
     const app = initializeApp(firebaseConfig);
@@ -145,15 +154,26 @@
       const id = document.getElementById('booth-id').value.trim();
       const pass = document.getElementById('booth-pass').value.trim();
       errorMsg.innerText = "";
-      if (!id || !pass) { errorMsg.innerText = "IDとパスワードを入力してください。"; return; }
+      
+      if (!id || !pass) { 
+        errorMsg.innerText = "IDとパスワードを入力してください。"; 
+        return; 
+      }
+      
+      // APIキーが初期値のままの場合の警告
+      if (window.MY_API_KEY === "YOUR_API_KEY") {
+        errorMsg.innerText = "HTML一番上の API_KEY が設定されていません。";
+        return;
+      }
       
       const email = id + "@event.local";
       loginBtn.innerHTML = "ログイン中...<i class='material-icons right'>hourglass_empty</i>";
       
       signInWithEmailAndPassword(auth, email, pass)
         .then(() => loginBtn.innerHTML = "ログイン<i class='material-icons right'>login</i>")
-        .catch(() => {
+        .catch((err) => {
           loginBtn.innerHTML = "ログイン<i class='material-icons right'>login</i>";
+          console.error(err);
           errorMsg.innerText = "IDまたはパスワードが間違っています。";
         });
     });
@@ -218,10 +238,8 @@
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
         if (code) {
-          // QRコードを発見した時の処理
           qrResultText.innerText = "読み取り成功: " + code.data;
           
-          // 連続で読み取らないように2秒ストップ
           setTimeout(() => {
              requestAnimationFrameId = requestAnimationFrame(scanQR);
              qrResultText.innerText = "次のQRコードをかざしてください";
