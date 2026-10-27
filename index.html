@@ -4,182 +4,242 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>受付システム</title>
+  
+  <!-- Material Design 関連の読み込み -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  
   <style>
-    /* 簡単なデザイン（適宜変更してください） */
-    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-    #login-screen, #main-screen { max-width: 400px; margin: 0 auto; padding: 20px; }
-    input { width: 80%; padding: 10px; margin: 10px 0; font-size: 16px; }
-    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-    .error { color: red; font-size: 14px; }
+    body { background-color: #f0f2f5; display: flex; min-height: 100vh; flex-direction: column; }
+    main { flex: 1 0 auto; padding-top: 5vh; }
+    .card { border-radius: 12px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    #camera-area { display: none; margin-top: 20px; position: relative; width: 100%; max-width: 400px; margin-left: auto; margin-right: auto; }
+    video { width: 100%; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .qr-result { margin-top: 15px; font-size: 1.2rem; font-weight: bold; color: #1976d2; }
   </style>
 </head>
 <body>
 
-  <!-- ========================================== -->
-  <!-- 1. ログイン画面 -->
-  <!-- ========================================== -->
-  <div id="login-screen">
-    <h2>受付ブース ログイン</h2>
-    <input type="text" id="booth-id" placeholder="ブースID (例: 12345)">
-    <input type="password" id="booth-pass" placeholder="パスワード">
-    <br>
-    <button id="login-btn">ログイン</button>
-    <p id="login-error" class="error"></p>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- 2. メイン画面（ログイン成功後に表示される） -->
-  <!-- ========================================== -->
-  <div id="main-screen" style="display: none;">
-    <h2>受付カメラ画面</h2>
-    <p>ブース: <span id="display-booth-id"></span></p>
-    <button id="logout-btn">ログアウト</button>
-    <hr>
-    
-    <!-- ここに、今まで作ったカメラ起動ボタンやQR読み取りの仕組みを入れます -->
-    <button id="start-camera-btn">📷 カメラを起動</button>
-    <br><br>
-    <div id="camera-area">
-      <!-- カメラ映像が映るエリア -->
+  <main class="container">
+    <!-- ========================================== -->
+    <!-- 1. ログイン画面（Material Design） -->
+    <!-- ========================================== -->
+    <div id="login-screen" class="row">
+      <div class="col s12 m6 offset-m3">
+        <div class="card">
+          <div class="card-content">
+            <span class="card-title center-align" style="font-weight: bold; color: #333;">受付ブース ログイン</span>
+            <div class="input-field" style="margin-top: 30px;">
+              <i class="material-icons prefix">store</i>
+              <input id="booth-id" type="text">
+              <label for="booth-id">ブースID</label>
+            </div>
+            <div class="input-field">
+              <i class="material-icons prefix">lock</i>
+              <input id="booth-pass" type="password">
+              <label for="booth-pass">パスワード</label>
+            </div>
+            <div class="center-align red-text" id="login-error" style="font-weight: bold;"></div>
+          </div>
+          <div class="card-action center-align" style="border-top: none;">
+            <button class="btn-large waves-effect waves-light blue darken-1" id="login-btn" style="border-radius: 20px; width: 80%;">
+              ログイン<i class="material-icons right">login</i>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
 
+    <!-- ========================================== -->
+    <!-- 2. メイン画面（受付カメラ画面） -->
+    <!-- ========================================== -->
+    <div id="main-screen" class="row" style="display: none;">
+      <div class="col s12 m8 offset-m2">
+        <div class="card">
+          <div class="card-content">
+            <div class="right-align">
+              <button class="btn-flat waves-effect waves-red grey-text" id="logout-btn">
+                <i class="material-icons left">logout</i>ログアウト
+              </button>
+            </div>
+            <h5 class="center-align" style="font-weight: bold; margin-bottom: 20px;">受付スキャン</h5>
+            <p class="center-align grey-text">ブース: <strong id="display-booth-id" class="black-text"></strong></p>
+            
+            <div class="center-align" style="margin-top: 30px;">
+              <button class="btn-large waves-effect waves-light green darken-1" id="start-camera-btn" style="border-radius: 20px; width: 80%;">
+                <i class="material-icons left">camera_alt</i>カメラを起動
+              </button>
+            </div>
+
+            <!-- カメラ映像エリア -->
+            <div id="camera-area" class="center-align">
+              <video id="video" playsinline autoplay></video>
+              <canvas id="canvas" hidden></canvas>
+              <div id="qr-result" class="qr-result">ここに読み取り結果が出ます</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- jsQRの読み込み（QRコード解析） -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <!-- Materialize CSSのJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 
   <!-- ========================================== -->
-  <!-- Firebase と ログイン制御の JavaScript -->
+  <!-- Firebase & アプリケーションロジック -->
   <!-- ========================================== -->
   <script type="module">
-    // Firebase SDK の読み込み
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
     import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // ▼▼▼ Firebaseの設定（Firebaseコンソールからコピーして書き換えてください） ▼▼▼
+    // ▼▼▼ 先ほど取得した本物のAPIキーに書き換えてください ▼▼▼
     const firebaseConfig = {
-      apiKey: "AIzaSyB8p3dqiw2mmvyFxV6-CvahbNAh2r0LYuc",
-      authDomain: "uketuke-ai-cafe.firebaseapp.com",
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
       databaseURL: "https://uketuke-ai-cafe-default-rtdb.asia-southeast1.firebasedatabase.app/",
-      projectId: "uketuke-ai-cafe",
+      projectId: "YOUR_PROJECT_ID",
     };
 
-    // 初期化
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
 
-    // 画面要素の取得
     const loginScreen = document.getElementById('login-screen');
     const mainScreen = document.getElementById('main-screen');
     const loginBtn = document.getElementById('login-btn');
     const logoutBtn = document.getElementById('logout-btn');
     const errorMsg = document.getElementById('login-error');
+    
+    // カメラ関連要素
+    const video = document.getElementById('video');
+    const canvasElement = document.getElementById('canvas');
+    const canvasContext = canvasElement.getContext('2d', { willReadFrequently: true });
+    const cameraArea = document.getElementById('camera-area');
+    const startCameraBtn = document.getElementById('start-camera-btn');
+    const qrResultText = document.getElementById('qr-result');
+    let requestAnimationFrameId = null;
 
-    // 自分の端末のセッショントークン
     let mySessionToken = "";
     let currentBoothId = "";
 
     // --------------------------------------------------
-    // ログイン状態の監視（ページを開いた時やリロード時に自動実行）
+    // ログイン監視 ＆ 許可時間チェック
     // --------------------------------------------------
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // ログイン済みの場合
-        currentBoothId = user.email.split('@')[0]; // booth01@event.local -> booth01
+        currentBoothId = user.email.split('@')[0];
         document.getElementById('display-booth-id').innerText = currentBoothId;
-        
-        // 時間チェックと多重ログイン判定を行う
         await checkPermissionAndStartSession(currentBoothId);
       } else {
-        // 未ログインの場合：ログイン画面を表示
+        stopCamera();
         loginScreen.style.display = "block";
         mainScreen.style.display = "none";
       }
     });
 
-    // --------------------------------------------------
-    // ログインボタンを押した時の処理
-    // --------------------------------------------------
     loginBtn.addEventListener('click', () => {
       const id = document.getElementById('booth-id').value.trim();
       const pass = document.getElementById('booth-pass').value.trim();
       errorMsg.innerText = "";
-
-      if (!id || !pass) {
-        errorMsg.innerText = "IDとパスワードを入力してください。";
-        return;
-      }
-
-      // 仮想メールアドレスを作成してログイン
-      const email = id + "@event.local";
+      if (!id || !pass) { errorMsg.innerText = "IDとパスワードを入力してください。"; return; }
       
-      loginBtn.innerText = "ログイン中...";
+      const email = id + "@event.local";
+      loginBtn.innerHTML = "ログイン中...<i class='material-icons right'>hourglass_empty</i>";
       
       signInWithEmailAndPassword(auth, email, pass)
-        .then(() => {
-          loginBtn.innerText = "ログイン";
-          // 成功後の画面切り替えは onAuthStateChanged が自動でやってくれます
-        })
-        .catch((error) => {
-          loginBtn.innerText = "ログイン";
-          console.error(error);
+        .then(() => loginBtn.innerHTML = "ログイン<i class='material-icons right'>login</i>")
+        .catch(() => {
+          loginBtn.innerHTML = "ログイン<i class='material-icons right'>login</i>";
           errorMsg.innerText = "IDまたはパスワードが間違っています。";
         });
     });
 
-    // --------------------------------------------------
-    // ログアウトボタン
-    // --------------------------------------------------
-    logoutBtn.addEventListener('click', () => {
-      signOut(auth);
-    });
+    logoutBtn.addEventListener('click', () => signOut(auth));
 
-    // --------------------------------------------------
-    // 許可時間チェック ＆ トークン管理（多重ログイン防止）
-    // --------------------------------------------------
     async function checkPermissionAndStartSession(boothId) {
-      const boothRef = ref(db, 'config/booths/' + boothId);
-      
-      // 1. Firebaseからこのブースの許可時間を取得
-      const snapshot = await get(boothRef);
+      const snapshot = await get(ref(db, 'config/booths/' + boothId));
       if (!snapshot.exists()) {
-        alert("ブースの設定データが見つかりません。");
-        signOut(auth);
-        return;
+        alert("ブースの設定データが見つかりません。"); signOut(auth); return;
       }
-
       const config = snapshot.val();
-      
-      // 2. 日時チェック (現在の日時と許可日時を比較)
       const now = new Date();
       const todayStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0');
       const nowTimeStr = String(now.getHours()).padStart(2,'0') + ":" + String(now.getMinutes()).padStart(2,'0');
 
       if (config.date !== todayStr || nowTimeStr < config.startTime || nowTimeStr > config.endTime) {
         alert(`現在は利用時間外です。\n許可日: ${config.date}\n時間: ${config.startTime}〜${config.endTime}`);
-        signOut(auth);
-        return;
+        signOut(auth); return;
       }
 
-      // 3. 多重ログイン防止のためのトークン発行
-      // ランダムな文字列（トークン）を作ってFirebaseに上書き保存
       mySessionToken = Math.random().toString(36).substring(2);
       await set(ref(db, 'config/booths/' + boothId + '/activeToken'), mySessionToken);
-
-      // 画面をメイン画面に切り替え
       loginScreen.style.display = "none";
       mainScreen.style.display = "block";
 
-      // 4. トークンの監視（他の端末がログインしたら弾く）
       onValue(ref(db, 'config/booths/' + boothId + '/activeToken'), (snapshot) => {
         const dbToken = snapshot.val();
-        // Firebase上のトークンが自分のものと違っていたら（＝誰かが後からログインしたら）
         if (dbToken && dbToken !== mySessionToken) {
           alert("別の端末でログインされたため、ログアウトしました。");
-          signOut(auth); // 強制ログアウト
+          signOut(auth);
         }
       });
     }
 
+    // --------------------------------------------------
+    // QRコードカメラ読み取り機能
+    // --------------------------------------------------
+    startCameraBtn.addEventListener('click', () => {
+      cameraArea.style.display = "block";
+      startCameraBtn.style.display = "none";
+      qrResultText.innerText = "カメラを起動中...";
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(function(stream) {
+          video.srcObject = stream;
+          video.play();
+          requestAnimationFrameId = requestAnimationFrame(scanQR);
+        })
+        .catch(function(err) {
+          qrResultText.innerText = "カメラの起動に失敗しました。ブラウザのカメラ権限を確認してください。";
+        });
+    });
+
+    function scanQR() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvasElement.height = video.videoHeight;
+        canvasElement.width = video.videoWidth;
+        canvasContext.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+        
+        const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+        if (code) {
+          // QRコードを発見した時の処理
+          qrResultText.innerText = "読み取り成功: " + code.data;
+          
+          // 連続で読み取らないように2秒ストップ
+          setTimeout(() => {
+             requestAnimationFrameId = requestAnimationFrame(scanQR);
+             qrResultText.innerText = "次のQRコードをかざしてください";
+          }, 2000);
+          return;
+        }
+      }
+      requestAnimationFrameId = requestAnimationFrame(scanQR);
+    }
+
+    function stopCamera() {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+      if (requestAnimationFrameId) cancelAnimationFrame(requestAnimationFrameId);
+      cameraArea.style.display = "none";
+      startCameraBtn.style.display = "inline-block";
+    }
   </script>
 </body>
 </html>
