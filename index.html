@@ -295,6 +295,9 @@
     // 生徒データの照会 ＆ ★確認画面の表示
     // --------------------------------------------------
     async function processStudent(pNum) {
+      // ★ 追加：渡された番号（QRコード or 手入力）を4桁のゼロ埋めにする
+      pNum = String(pNum).padStart(4, '0');
+
       if (isProcessing) return;
       isProcessing = true;
       activeStudentPNum = pNum; 
